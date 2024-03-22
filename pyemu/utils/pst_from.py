@@ -938,10 +938,57 @@ class PstFrom(object):
             index_cols,
             use_cols,
         ) = self._prep_arg_list_lengths(
-            filenames, fmts, seps, skip_rows, index_cols, use_cols
+            filenames, fmts=fmts, seps=seps, skip_rows=skip_rows,
+            index_cols=index_cols, use_cols=use_cols
         )
         storehead = None
-        if index_cols is not None:
+        if use_cols is None and index_cols is None: #array style
+            # loop over model input files
+            for input_filena, sep, fmt, skip in zip(filenames, seps, fmts, skip_rows):
+                # cast to pathlib.Path instance
+                # input file path may or may not include original_d
+                input_filena = get_filepath(self.original_d, input_filena)
+                if fmt.lower() == "free":
+                    # cast to string to work with pathlib objects
+                    if input_filena.suffix.lower() == ".csv":
+                        if sep is None:
+                            sep = ","
+                else:
+                    # TODO - or not?
+                    raise NotImplementedError(
+                        "Only free format array par files currently supported"
+                    )
+                # file path relative to model workspace
+                rel_filepath = input_filena.relative_to(self.original_d)
+                dest_filepath = self.new_d / rel_filepath
+                self.logger.log(f"loading array {dest_filepath}")
+                if not dest_filepath.exists():
+                    self.logger.lraise(f"par filename '{dest_filepath}' not found ")
+                # read array type input file
+                arr = np.loadtxt(dest_filepath, delimiter=sep, ndmin=2)
+                self.logger.log(f"loading array {dest_filepath}")
+                self.logger.statement(
+                    f"loaded array '{input_filena}' of shape {arr.shape}"
+                )
+                # save copy of input file to `org` dir
+                # make any subfolders if they don't exist
+                np.savetxt(self.original_file_d / rel_filepath.name, arr)
+                file_dict[rel_filepath] = arr
+                fmt_dict[rel_filepath] = fmt
+                sep_dict[rel_filepath] = sep
+                skip_dict[rel_filepath] = skip
+            # check for compatibility
+            fnames = list(file_dict.keys())
+            for i in range(len(fnames)):
+                for j in range(i + 1, len(fnames)):
+                    if file_dict[fnames[i]].shape != file_dict[fnames[j]].shape:
+                        self.logger.lraise(
+                            f"shape mismatch for array style, '{fnames[i]}' "
+                            f"shape {file_dict[fnames[i]].shape[1]} != "
+                            f"'{fnames[j]}' "
+                            f"shape {file_dict[fnames[j]].shape[1]}"
+                        )
+        else: # tabular style
             for filename, sep, fmt, skip in zip(filenames, seps, fmts, skip_rows):
                 # cast to pathlib.Path instance
                 # input file path may or may not include original_d
@@ -953,7 +1000,7 @@ class PstFrom(object):
                 org_file = self.original_file_d / rel_filepath.name
 
                 self.logger.log(f"loading list-style {dest_filepath}")
-                df, storehead, _ = self._load_listtype_file(
+                df, storehead, use_cols, _ = self._load_listtype_file(
                     rel_filepath, index_cols, use_cols, fmt, sep, skip, c_char
                 )
                 # Currently just passing through comments in header (i.e. before the table data)
@@ -1048,52 +1095,6 @@ class PstFrom(object):
             for i in range(len(fnames)):
                 for j in range(i + 1, len(fnames)):
                     if file_dict[fnames[i]].shape[1] != file_dict[fnames[j]].shape[1]:
-                        self.logger.lraise(
-                            f"shape mismatch for array style, '{fnames[i]}' "
-                            f"shape {file_dict[fnames[i]].shape[1]} != "
-                            f"'{fnames[j]}' "
-                            f"shape {file_dict[fnames[j]].shape[1]}"
-                        )
-        else:  # load array type files
-            # loop over model input files
-            for input_filena, sep, fmt, skip in zip(filenames, seps, fmts, skip_rows):
-                # cast to pathlib.Path instance
-                # input file path may or may not include original_d
-                input_filena = get_filepath(self.original_d, input_filena)
-                if fmt.lower() == "free":
-                    # cast to string to work with pathlib objects
-                    if input_filena.suffix.lower() == ".csv":
-                        if sep is None:
-                            sep = ","
-                else:
-                    # TODO - or not?
-                    raise NotImplementedError(
-                        "Only free format array par files currently supported"
-                    )
-                # file path relative to model workspace
-                rel_filepath = input_filena.relative_to(self.original_d)
-                dest_filepath = self.new_d / rel_filepath
-                self.logger.log(f"loading array {dest_filepath}")
-                if not dest_filepath.exists():
-                    self.logger.lraise(f"par filename '{dest_filepath}' not found ")
-                # read array type input file
-                arr = np.loadtxt(dest_filepath, delimiter=sep, ndmin=2)
-                self.logger.log(f"loading array {dest_filepath}")
-                self.logger.statement(
-                    f"loaded array '{input_filena}' of shape {arr.shape}"
-                )
-                # save copy of input file to `org` dir
-                # make any subfolders if they don't exist
-                np.savetxt(self.original_file_d / rel_filepath.name, arr)
-                file_dict[rel_filepath] = arr
-                fmt_dict[rel_filepath] = fmt
-                sep_dict[rel_filepath] = sep
-                skip_dict[rel_filepath] = skip
-            # check for compatibility
-            fnames = list(file_dict.keys())
-            for i in range(len(fnames)):
-                for j in range(i + 1, len(fnames)):
-                    if file_dict[fnames[i]].shape != file_dict[fnames[j]].shape:
                         self.logger.lraise(
                             f"shape mismatch for array style, '{fnames[i]}' "
                             f"shape {file_dict[fnames[i]].shape[1]} != "
@@ -1434,8 +1435,8 @@ class PstFrom(object):
             seps=ofile_sep,
             skip_rows=ofile_skip,
         )
-        # array style obs, if both index_cols and use_cols are None (default)
-        if index_cols is None and use_cols is None:
+        # array style obs, if index_cols is None (default)
+        if index_cols is None:
             if not isinstance(filenames, str):
                 if len(filenames) > 1:
                     self.logger.lraise(
@@ -1477,7 +1478,7 @@ class PstFrom(object):
                 "adding observations from tabular output file " "'{0}'".format(filenames)
             )
             # -- will end up here if either of index_cols or use_cols is not None
-            df, storehead, inssep = self._load_listtype_file(
+            df, storehead, use_cols, inssep = self._load_listtype_file(
                 filenames, index_cols, use_cols, fmts, seps, skip_rows
             )
             # parse to numeric (read as dtype object to preserve mixed types)
@@ -1502,7 +1503,7 @@ class PstFrom(object):
                 df = df.apply(pd.to_numeric, errors="coerce").fillna(df)
             # Select all non index cols if use_cols is None
             if use_cols is None:
-                use_cols = df.columns.drop(index_cols).tolist()
+                use_cols = df.iloc[0][use_cols].drop(index_cols).tolist()
             # Currently just passing through comments in header (i.e. before the table data)
             lenhead = 0
             stkeys = np.array(
@@ -1521,8 +1522,8 @@ class PstFrom(object):
                 df_temp = _get_tpl_or_ins_df(
                     df,
                     prefix,
-                    typ="obs",
-                    index_cols=index_cols,
+                    index_cols,
+                    "obs",
                     use_cols=use_cols,
                 )
                 df.loc[:, "idx_str"] = df_temp.idx_strs
@@ -1788,9 +1789,7 @@ class PstFrom(object):
                 are set up. If parameter file is tabular list-style file
                 (`index_cols` is not None) then :
                 len(par_name_base) must equal len(use_cols)
-            index_cols (`list`-like): if not None, will attempt to parameterize
-                expecting a tabular-style model input file. `index_cols`
-                defines the unique columns used to set up pars. If passed as a
+            index_cols (`list`-like): defines the unique columns used to set up pars. If passed as a
                 list of `str`, stings are expected to denote the columns
                 headers in tabular-style parameter files; if `i` and `j` in
                 list, these columns will be used to define spatial position for
@@ -1799,8 +1798,19 @@ class PstFrom(object):
                 in the list. Can be passed as a dictionary using the keys
                 `i` and `j` to explicitly speficy the columns that relate to
                 model rows and columns to be identified and processed to x,y.
+                if None, will expect a array-style model input file.
+                if 'auto_index' will attempt to parameterize using the default indicies assigned
+                with pd.read_csv().
+                valid combos of [index_cols, use_cols]:
+                    [None, None]: array type
+                    [`list`-like or `int`, `list`-like or `int`]: specific index and specific columns
+                    [`list`-like or `int`, None]: paramaterize all columns except those in index_cols
+                    ['auto_index, int]: pandas generated index, parameterize specific column number
+                    ['auto_index, None]: pandas generated index, parameterize all columns
             use_cols (`list`-like or `int`): for tabular-style model input file,
-                defines the columns to be parameterised
+                defines the columns to be parameterized. If use_cols is None
+                will attempt to parameterize every column using the default index assigned
+                with pd.read_csv().
             use_rows (`list` or `tuple`): Setup parameters for
                 only specific rows in list-style model input file.
                 Action is dependent on the the dimensions of use_rows.
@@ -1812,7 +1822,7 @@ class PstFrom(object):
                 values for 3 `index_cols` are 3,5,6. N.B. values in tuple are the actual
                 model file entry values.
                 If no rows in the model input file match `use_rows`, parameters
-                will be set up for all rows. Only valid/effective if index_cols is not None.
+                will be set up for all rows. Only valid/effective if use_cols is not None (tabular-style input).
                 Default is None -- setup parameters for all rows.
             pargp (`str`): Parameter group to assign pars to. This is PESTs
                 pargp but is also used to gather correlated parameters set up
@@ -2032,7 +2042,6 @@ class PstFrom(object):
                     "keys need to contain [`i` and `j`] or "
                     "[`x` and `y`]"
                 )
-
         (
             index_cols,
             use_cols,
@@ -2070,9 +2079,9 @@ class PstFrom(object):
         if isinstance(par_name_base, str):
             par_name_base = [par_name_base]
         # if `use_cols` is passed check number of base names is the same as cols
-        if use_cols is None and len(par_name_base) == 1:
+        if len(par_name_base) == 1:
             pass
-        elif use_cols is not None and len(par_name_base) == len(use_cols):
+        elif len(par_name_base) == len(use_cols):
             pass
         else:
             self.logger.lraise(
@@ -2155,21 +2164,6 @@ class PstFrom(object):
         nxs = None
         # Process model parameter files to produce appropriate pest pars
         if index_cols is not None:  # Assume list/tabular type input files
-            # ensure inputs are provided for all required cols
-            ncol = len(use_cols)
-            ult_lbound = _check_var_len(ult_lbound, ncol, fill=ubfill)
-            ult_ubound = _check_var_len(ult_ubound, ncol, fill=lbfill)
-            pargp = _check_var_len(pargp, ncol)
-            lower_bound = _check_var_len(lower_bound, ncol, fill="first")
-            upper_bound = _check_var_len(upper_bound, ncol, fill="first")
-            if len(use_cols) != len(ult_lbound) != len(ult_ubound):
-                self.logger.lraise(
-                    "mismatch in number of columns to use {0} "
-                    "and number of ultimate lower {0} or upper "
-                    "{1} par bounds defined"
-                    "".format(len(use_cols), len(ult_lbound), len(ult_ubound))
-                )
-
             self.logger.log(
                 "writing list-style template file '{0}'".format(tpl_filename)
             )
@@ -2185,10 +2179,10 @@ class PstFrom(object):
                 filenames,
                 dfs,
                 par_name_base,
-                tpl_filename=tpl_filename,
-                par_type=par_type,
+                tpl_filename,
+                index_cols,
+                par_type,
                 suffix="",
-                index_cols=index_cols,
                 use_cols=use_cols,
                 use_rows=use_rows,
                 zone_array=zone_array,
@@ -2209,9 +2203,23 @@ class PstFrom(object):
             ), "Parameter dataframe wrong shape for number of cols {0}" "".format(
                 use_cols
             )
-            # variables need to be passed to each row in df
-            lower_bound = np.tile(lower_bound, int(len(df) / ncol))
-            upper_bound = np.tile(upper_bound, int(len(df) / ncol))
+            # ensure inputs are provided for all required cols if not None
+            # was checked before write_list_tpl but turned original type() into list
+            # keeping check but not converting to list
+            ncol = len(use_cols)
+            ck_ult_lbound = _check_var_len(ult_lbound, ncol, fill=ubfill)
+            ck_ult_ubound = _check_var_len(ult_ubound, ncol, fill=lbfill)
+            ck_pargp = _check_var_len(pargp, ncol)
+            ck_lower_bound = _check_var_len(lower_bound, ncol, fill="first")
+            ck_upper_bound = _check_var_len(upper_bound, ncol, fill="first")
+            if len(use_cols) != len(ck_ult_lbound) != len(ck_ult_ubound)\
+                    != len(ck_pargp) != len(ck_lower_bound) != len(ck_upper_bound):
+                self.logger.lraise(
+                    "mismatch in number of columns to use {0} "
+                    "and number of ultimate lower {0} or upper "
+                    "{1} par bounds defined"
+                    "".format(len(use_cols), len(ult_lbound), len(ult_ubound))
+                )
             self.logger.log(
                 "writing list-style template file '{0}'".format(tpl_filename)
             )
@@ -2262,7 +2270,7 @@ class PstFrom(object):
                     )
                 # Setup pilotpoints for array type par files
                 self.logger.log("setting up pilot point parameters")
-                # finding spatial references for for setting up pilot points
+                # finding spatial references for setting up pilot points
                 if spatial_reference is None:
                     # if none passed with add_pars call
                     self.logger.statement(
@@ -2700,6 +2708,8 @@ class PstFrom(object):
         df.loc[:, "partrans"] = transform
         df.loc[:, "parubnd"] = upper_bound
         df.loc[:, "parlbnd"] = lower_bound
+        df.loc[:, "ult_ubound"] = ult_ubound
+        df.loc[:, "ult_lbound"] = ult_lbound
         if par_style != "d":
             df.loc[:, "parval1"] = initial_value
         # df.loc[:,"tpl_filename"] = tpl_filename
@@ -2826,37 +2836,37 @@ class PstFrom(object):
         # -- case of both being None should already have been caught
         # but index_cols could still be None...
 
-        check_args = [a for a in [index_cols, use_cols] if a is not None]
-        # `a` should be list if it is not None
-        if all(isinstance(a[0], str) for a in check_args):
-            # index_cols can be from header str
-            header = 0  # will need to read a header
-        elif all(isinstance(a[0], int) for a in check_args):
+        # wk: now using user supplied index_cols='auto_index' to trigger auto_index
+        # using use_cols = None to read in all cols
+        # getting a bit unclean w the checks?
+        if index_cols == ['auto_index']:
+            # index_cols will be pandas generated, assumes index_cols are column numbers in input file
+            header = None
+        elif all(all(isinstance(_, int) for _ in a) for a in index_cols):
             # index_cols are column numbers in input file
             header = None
+        elif all(all(isinstance(_, str) for _ in a) for a in index_cols):
+            # index_cols can be from header str
+            header = 0  # will need to read a header
         else:
-            if len(check_args) > 1:
-                #  implies neither are None but they either both are not str,int
-                #  or are different
-                self.logger.lraise(
-                    "unrecognized type for index_cols or use_cols "
-                    "should be str or int and both should be of the "
-                    "same type, not {0} or {1}".format(
-                        *[str(type(a[0])) for a in check_args]
-                    )
+            self.logger.lraise(
+                "unrecognized type for index_cols or use_cols or combo "
+                "valid combos:"
+                "[None, None]: array type"
+                "[list of str or int, list of str or int]: specific index and specific columns"
+                "[list of str or int, None]: paramaterize all columns except those in index_cols"
+                "['auto_index, int]: pandas generated index, parameterize specific column number"
+                "['auto_index, None]: pandas generated index, parameterize all columns"
+                ", not {0} or {1}".format(
+                    *[str(type(index_cols[0])), str(type(use_cols))]
                 )
-            else:
-                # implies not correct type
-                self.logger.lraise(
-                    "unrecognized type for either index_cols or use_cols "
-                    "should be str or int, not {0}".format(type(check_args[0][0]))
-                )
-
+            )
         # checking no overlap between index_cols and use_cols
-        if len(check_args) > 1:
+        # allow for [index='auto_index', use_cols=None] option where
+        # no overlap is ensured by df.columns.drop('auto_index').to_list()
+        if use_cols is not None:
             si = set(index_cols)
             su = set(use_cols)
-
             i = si.intersection(su)
             if len(i) > 0:
                 self.logger.lraise(f"use_cols also listed in index_cols: {str(i)}")
@@ -2916,6 +2926,10 @@ class PstFrom(object):
             low_memory=False,
             dtype='object'
         )
+        if 'auto_index' in index_cols:
+            df['auto_index'] = df.index
+        if use_cols is None:
+            use_cols = df.columns.drop('auto_index').to_list()
         self.logger.log(f"reading list-style file: {file_path}")
         # ensure that column ids from index_col is in input file
         missing = []
@@ -2940,7 +2954,7 @@ class PstFrom(object):
                 "in file '{0}':{1}"
                 "".format(file_path, str(missing))
             )
-        return df, storehead, sep
+        return df, storehead, use_cols, sep
 
     def _prep_arg_list_lengths(
         self,
@@ -3014,17 +3028,13 @@ class PstFrom(object):
             skip_rows = [skip_rows[0] for _ in filenames]
         skip_rows = [0 if s is None else s for s in skip_rows]
 
-        if index_cols is None and use_cols is not None:
-            self.logger.lraise(
-                "index_cols is None, but use_cols is not ({0})" "".format(str(use_cols))
-            )
-
         if index_cols is not None:
             if not isinstance(index_cols, list):
                 index_cols = [index_cols]
         if use_cols is not None:
             if not isinstance(use_cols, list):
                 use_cols = [use_cols]
+
         return filenames, fmts, seps, skip_rows, index_cols, use_cols
 
 
@@ -3080,7 +3090,7 @@ def write_list_tpl(
                 tuple are actual model file entry values.
             If no rows in the model input file match `use_rows` -- parameters
                 will be set up for all rows.
-            Only valid/effective if index_cols is not None.
+            Only valid/effective if use_cols is not None (tabular-style input).
             Default is None -- setup parameters for all rows.
         suffix (`str`): Optional par name suffix
         zone_array (`np.ndarray`): Array defining zone divisions.
@@ -3322,7 +3332,7 @@ def _write_direct_df_tpl(
         name,
         gpname,
         suffix,
-        par_style="d",
+        "d",
         init_df=df,
         init_fname=in_filename,
     )
@@ -3476,11 +3486,9 @@ def _build_parnames(
         direct_tpl_df = init_df.copy()
         if typ == "constant":
             assert init_fname is not None
-    if use_cols is None:
-        use_cols = [c for c in df.columns if c not in index_cols]
         # if direct, we have more to deal with...
     for iuc, use_col in enumerate(use_cols):
-        if not isinstance(basename, str):
+        if not isinstance(basename, str): #should be converted to list on line 2079
             nname = basename[iuc]
             # if zone type, find the zones for each index position
         else:
@@ -3654,7 +3662,7 @@ def _get_tpl_or_ins_df(
     sidx = []
     for df in dfs:
         # avoiding df.values to prevent conversion to same type
-        didx = zip(*[df[col] for col in index_cols])
+        didx = zip(*[df[[col]] for col in index_cols]) # ensures same index_cols in each?
         aidx = [i for i in didx if i not in sidx]
         sidx.extend(aidx)
 
