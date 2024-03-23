@@ -2165,7 +2165,6 @@ class PstFrom(object):
         # parameter fields affected by use_cols
         puse_cols = {'parlbnd': lower_bound,
                      'parubnd': upper_bound,
-                     'par_type': par_type,
                      'pargp': pargp,
                      'partrans': transform,
                      'ult_lbound': ult_lbound,
