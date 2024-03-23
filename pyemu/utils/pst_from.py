@@ -2163,11 +2163,11 @@ class PstFrom(object):
         fac_filename = None
         nxs = None
         # parameter fields affected by use_cols
-        puse_cols = {'lower_bound': lower_bound,
-                     'upper_bound': upper_bound,
+        puse_cols = {'parlbnd': lower_bound,
+                     'parubnd': upper_bound,
                      'par_type': par_type,
                      'pargp': pargp,
-                     'transform': transform,
+                     'partrans': transform,
                      'ult_lbound': ult_lbound,
                      'ult_ubound': ult_ubound,
                      }
@@ -2547,8 +2547,8 @@ class PstFrom(object):
                     "cov": ok_pp.point_cov_df,
                     "zn_ar": zone_array,
                     "sr": spatial_reference,
-                    "pstyle":par_style,
-                    "transform":transform
+                    "pstyle": par_style,
+                    "transform": transform
                 }
                 fac_processed = False
                 for facfile, info in self._pp_facs.items():  # check against
@@ -2675,8 +2675,8 @@ class PstFrom(object):
                 "fmt": fmt_dict[mod_file],
                 "sep": sep_dict[mod_file],
                 "head_rows": skip_dict[mod_file],
-                "upper_bound": puse_cols['upper_bound'], #ult_ubound,
-                "lower_bound": puse_cols['lower_bound'], #ult_lbound,
+                "upper_bound": puse_cols['parubnd'], #ult_ubound,
+                "lower_bound": puse_cols['parlbnd'], #ult_lbound,
                 "ult_ubound": puse_cols['ult_ubound'],
                 "ult_lbound": puse_cols['ult_lbound'],
                 "operator": 'par_style',
