@@ -2841,8 +2841,7 @@ class PstFrom(object):
         # wk: now using user supplied index_cols='auto_index' to trigger auto_index
         # using use_cols = None to read in all cols
         # getting a bit unclean w the checks?
-        if index_cols == ['auto_index']:
-            # index_cols will be pandas generated, assumes index_cols are column numbers in input file
+        if use_cols is None:
             header = None
         elif all(all(isinstance(_, int) for _ in a) for a in index_cols):
             # index_cols are column numbers in input file
@@ -2930,7 +2929,7 @@ class PstFrom(object):
         )
         if 'auto_index' in index_cols:
             df['auto_index'] = df.index
-            df = df.drop('auto_index')
+            df = df.drop('auto_index', axis=1)
         if use_cols is None:
             use_cols = df.columns.drop(index_cols).tolist()
         self.logger.log(f"reading list-style file: {file_path}")
