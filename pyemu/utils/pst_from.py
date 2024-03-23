@@ -2714,7 +2714,7 @@ class PstFrom(object):
 
         if par_style != "d":
             df.loc[:, "parval1"] = [initial_value for _ in df.index]
-        # df.loc[:,"tpl_filename"] = tpl_filename
+        df.loc[:,"par_type"] = par_type
 
         # store tpl --> in filename pair
         self.tpl_filenames.append(get_relative_filepath(self.new_d, tpl_filename))
