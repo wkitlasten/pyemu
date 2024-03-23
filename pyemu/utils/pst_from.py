@@ -2679,7 +2679,7 @@ class PstFrom(object):
                 "lower_bound": puse_cols['parlbnd'], #ult_lbound,
                 "ult_ubound": puse_cols['ult_ubound'],
                 "ult_lbound": puse_cols['ult_lbound'],
-                "operator": 'par_style',
+                "operator": par_style,
             }
             if nxs:
                 mult_dict["chkpar"] = nxs[mod_file]
