@@ -538,7 +538,7 @@ class PstFrom(object):
             # (setup through add_parameters)
             for geostruct, par_df_l in struct_dict.items():
                 par_df = pd.concat(par_df_l)  # force to single df
-                par_df = par_df.loc[par_df.partype == "grid", :]
+                par_df = par_df.loc[par_df.par_type == "grid", :]
                 if "i" in par_df.columns:  # need 'i' and 'j' for specsim
                     grd_p = pd.notna(par_df.i)
                 else:
@@ -1436,7 +1436,7 @@ class PstFrom(object):
             skip_rows=ofile_skip,
         )
         # array style obs, if index_cols is None (default)
-        if index_cols is None:
+        if index_cols is None and use_cols is None:
             if not isinstance(filenames, str):
                 if len(filenames) > 1:
                     self.logger.lraise(
@@ -1474,6 +1474,7 @@ class PstFrom(object):
             )
         else:
             # list style obs
+            # Select all non index cols if use_cols is None
             self.logger.log(
                 "adding observations from tabular output file " "'{0}'".format(filenames)
             )
@@ -1501,9 +1502,7 @@ class PstFrom(object):
                     columns=df.iloc[0].to_dict()
                 ).drop(0).reset_index(drop=True)
                 df = df.apply(pd.to_numeric, errors="coerce").fillna(df)
-            # Select all non index cols if use_cols is None
-            if use_cols is None:
-                use_cols = df.iloc[0][use_cols].drop(index_cols).tolist()
+
             # Currently just passing through comments in header (i.e. before the table data)
             lenhead = 0
             stkeys = np.array(
@@ -1527,6 +1526,7 @@ class PstFrom(object):
                     use_cols=use_cols,
                 )
                 df.loc[:, "idx_str"] = df_temp.idx_strs
+                #df.loc[:,'sidx'] = df_temp.sidx
                 # Select only certain rows if requested
                 if use_rows is not None:
                     if isinstance(use_rows, str):
@@ -1568,7 +1568,7 @@ class PstFrom(object):
                     nprefix = filenames[0]
                 nprefix = "oname:{0}_otype:lst".format(nprefix.lower())
                 df_ins = pyemu.pst_utils.csv_to_ins_file(
-                    df.set_index("idx_str"),
+                    df.set_index('idx_str'),
                     ins_filename=self.new_d / insfile,
                     only_cols=use_cols,
                     only_rows=use_rows,
@@ -2162,6 +2162,15 @@ class PstFrom(object):
         pp_filename = None  # setup placeholder variables
         fac_filename = None
         nxs = None
+        # parameter fields affected by use_cols
+        puse_cols = {'lower_bound': lower_bound,
+                     'upper_bound': upper_bound,
+                     'par_type': par_type,
+                     'pargp': pargp,
+                     'transform': transform,
+                     'ult_lbound': ult_lbound,
+                     'ult_ubound': ult_ubound,
+                     }
         # Process model parameter files to produce appropriate pest pars
         if index_cols is not None:  # Assume list/tabular type input files
             self.logger.log(
@@ -2203,23 +2212,15 @@ class PstFrom(object):
             ), "Parameter dataframe wrong shape for number of cols {0}" "".format(
                 use_cols
             )
-            # ensure inputs are provided for all required cols if not None
-            # was checked before write_list_tpl but turned original type() into list
-            # keeping check but not converting to list
             ncol = len(use_cols)
-            ck_ult_lbound = _check_var_len(ult_lbound, ncol, fill=ubfill)
-            ck_ult_ubound = _check_var_len(ult_ubound, ncol, fill=lbfill)
-            ck_pargp = _check_var_len(pargp, ncol)
-            ck_lower_bound = _check_var_len(lower_bound, ncol, fill="first")
-            ck_upper_bound = _check_var_len(upper_bound, ncol, fill="first")
-            if len(use_cols) != len(ck_ult_lbound) != len(ck_ult_ubound)\
-                    != len(ck_pargp) != len(ck_lower_bound) != len(ck_upper_bound):
-                self.logger.lraise(
-                    "mismatch in number of columns to use {0} "
-                    "and number of ultimate lower {0} or upper "
-                    "{1} par bounds defined"
-                    "".format(len(use_cols), len(ult_lbound), len(ult_ubound))
-                )
+            # check lengths, turns original type() into list len(list)=ncol
+            for c in puse_cols.keys():
+                puse_cols[c] = _check_var_len(puse_cols[c], ncol, fill=ubfill)
+                if len(use_cols) != len(puse_cols[c]):
+                    self.logger.lraise(
+                        f"mismatch in number of columns to use {use_cols} "
+                        f"and number of {c} {len(puse_cols[c])}"
+                        )
             self.logger.log(
                 "writing list-style template file '{0}'".format(tpl_filename)
             )
@@ -2674,9 +2675,11 @@ class PstFrom(object):
                 "fmt": fmt_dict[mod_file],
                 "sep": sep_dict[mod_file],
                 "head_rows": skip_dict[mod_file],
-                "upper_bound": ult_ubound,
-                "lower_bound": ult_lbound,
-                "operator": par_style,
+                "upper_bound": puse_cols['upper_bound'], #ult_ubound,
+                "lower_bound": puse_cols['lower_bound'], #ult_lbound,
+                "ult_ubound": puse_cols['ult_ubound'],
+                "ult_lbound": puse_cols['ult_lbound'],
+                "operator": 'par_style',
             }
             if nxs:
                 mult_dict["chkpar"] = nxs[mod_file]
@@ -2703,15 +2706,15 @@ class PstFrom(object):
         # store on self for use in pest build etc
         self._parfile_relations.append(relate_pars_df)
 
-        # add cols required for pst.parameter_data
-        df.loc[:, "partype"] = par_type
-        df.loc[:, "partrans"] = transform
-        df.loc[:, "parubnd"] = upper_bound
-        df.loc[:, "parlbnd"] = lower_bound
-        df.loc[:, "ult_ubound"] = ult_ubound
-        df.loc[:, "ult_lbound"] = ult_lbound
+        # add cols required for pst.parameter_data, tile to fit
+        for c in puse_cols.keys():
+            if use_cols is None and index_cols is None: # array style, single value
+                df.loc[:, c] = [puse_cols[c] for _ in df.index]
+            else: # potetially multiple columns, made into list above
+                df.loc[:, c] = np.tile([x for x in puse_cols[c]], int(len(df) / ncol)).T
+
         if par_style != "d":
-            df.loc[:, "parval1"] = initial_value
+            df.loc[:, "parval1"] = [initial_value for _ in df.index]
         # df.loc[:,"tpl_filename"] = tpl_filename
 
         # store tpl --> in filename pair
@@ -2929,7 +2932,7 @@ class PstFrom(object):
         if 'auto_index' in index_cols:
             df['auto_index'] = df.index
         if use_cols is None:
-            use_cols = df.columns.drop('auto_index').to_list()
+            use_cols = df.columns.drop(index_cols).tolist()
         self.logger.log(f"reading list-style file: {file_path}")
         # ensure that column ids from index_col is in input file
         missing = []
@@ -3488,7 +3491,7 @@ def _build_parnames(
             assert init_fname is not None
         # if direct, we have more to deal with...
     for iuc, use_col in enumerate(use_cols):
-        if not isinstance(basename, str): #should be converted to list on line 2079
+        if not isinstance(basename, str):
             nname = basename[iuc]
             # if zone type, find the zones for each index position
         else:
@@ -3662,7 +3665,7 @@ def _get_tpl_or_ins_df(
     sidx = []
     for df in dfs:
         # avoiding df.values to prevent conversion to same type
-        didx = zip(*[df[[col]] for col in index_cols]) # ensures same index_cols in each?
+        didx = zip(*[df[col] for col in index_cols]) # ensures same index_cols in each?
         aidx = [i for i in didx if i not in sidx]
         sidx.extend(aidx)
 
