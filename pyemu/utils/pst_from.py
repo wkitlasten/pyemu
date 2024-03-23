@@ -2930,6 +2930,7 @@ class PstFrom(object):
         )
         if 'auto_index' in index_cols:
             df['auto_index'] = df.index
+            df = df.drop('auto_index')
         if use_cols is None:
             use_cols = df.columns.drop(index_cols).tolist()
         self.logger.log(f"reading list-style file: {file_path}")
