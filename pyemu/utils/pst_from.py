@@ -1017,7 +1017,10 @@ class PstFrom(object):
                         sep = " "
                         if rel_filepath.suffix.lower() == ".csv":
                             sep = ","
+
                 if pd.api.types.is_integer_dtype(df.columns):  # df.columns.is_integer(): # really!???
+                    hheader = False
+                elif 'auto_index' in df.columns:
                     hheader = False
                 else:
                     hheader = df.columns
@@ -1038,8 +1041,6 @@ class PstFrom(object):
                 # make any subfolders if they don't exist
                 # org_path = Path(self.original_file_d, rel_file_path.parent)
                 # org_path.mkdir(exist_ok=True)
-                if 'auto_index' in df.columns:
-                    df = df.drop('auto_index', axis=1)   
                 if len(storehead) != 0:
                     kwargs = {}
                     if "win" in platform.platform().lower():
@@ -2842,9 +2843,9 @@ class PstFrom(object):
         # wk: now using user supplied index_cols='auto_index' to trigger auto_index
         # using use_cols = None to read in all cols
         # getting a bit unclean w the checks?
-        if use_cols is None and index_cols == 'auto_index':
+        if use_cols is None and index_cols == ['auto_index']:
             header = None
-        elif use_cols is None and index_cols != 'auto_index': # index supplied infers header
+        elif use_cols is None and index_cols != ['auto_index']: # index supplied infers header
             header = 0
         elif all(all(isinstance(_, int) for _ in a) for a in index_cols): # assume positional use_cols
             # index_cols are column numbers in input file
@@ -2934,7 +2935,7 @@ class PstFrom(object):
             df['auto_index'] = df.index
         if use_cols is None:
             use_cols = df.columns.drop(index_cols).to_list()
-        
+
         self.logger.log(f"reading list-style file: {file_path}")
         # ensure that column ids from index_col is in input file
         missing = []
@@ -3245,6 +3246,8 @@ def write_list_tpl(
             lambda x: "~  {0}  ~".format(x)
         )
     if par_style in ["m", "a"]:
+        if index_cols == ['auto_index']:
+            df_tpl = df_tpl.drop(['auto_index'], axis=1)
         pyemu.helpers._write_df_tpl(
             filename=tpl_filename, df=df_tpl, sep=",", tpl_marker="~"
         )
@@ -3351,6 +3354,9 @@ def _write_direct_df_tpl(
         header = True
     else:
         header = False
+    if index_cols == ['auto_index']:
+        header = False
+        direct_tpl_df = direct_tpl_df.drop(['auto_index'], axis=1)
     pyemu.helpers._write_df_tpl(
         tpl_filename, direct_tpl_df, index=False, header=header, headerlines=headerlines
     )
