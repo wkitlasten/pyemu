@@ -1038,7 +1038,8 @@ class PstFrom(object):
                 # make any subfolders if they don't exist
                 # org_path = Path(self.original_file_d, rel_file_path.parent)
                 # org_path.mkdir(exist_ok=True)
-
+                if 'auto_index' in df.columns:
+                    df = df.drop('auto_index', axis=1)   
                 if len(storehead) != 0:
                     kwargs = {}
                     if "win" in platform.platform().lower():
@@ -2841,9 +2842,11 @@ class PstFrom(object):
         # wk: now using user supplied index_cols='auto_index' to trigger auto_index
         # using use_cols = None to read in all cols
         # getting a bit unclean w the checks?
-        if use_cols is None:
+        if use_cols is None and index_cols == 'auto_index':
             header = None
-        elif all(all(isinstance(_, int) for _ in a) for a in index_cols):
+        elif use_cols is None and index_cols != 'auto_index': # index supplied infers header
+            header = 0
+        elif all(all(isinstance(_, int) for _ in a) for a in index_cols): # assume positional use_cols
             # index_cols are column numbers in input file
             header = None
         elif all(all(isinstance(_, str) for _ in a) for a in index_cols):
@@ -2929,9 +2932,9 @@ class PstFrom(object):
         )
         if 'auto_index' in index_cols:
             df['auto_index'] = df.index
-            df = df.drop('auto_index', axis=1)
         if use_cols is None:
-            use_cols = df.columns.drop(index_cols).tolist()
+            use_cols = df.columns.drop(index_cols).to_list()
+        
         self.logger.log(f"reading list-style file: {file_path}")
         # ensure that column ids from index_col is in input file
         missing = []
@@ -2946,10 +2949,9 @@ class PstFrom(object):
                 "".format(file_path, str(missing))
             )
         # ensure requested use_cols are in input file
-        if use_cols is not None:
-            for use_col in use_cols:
-                if use_col not in df.columns:
-                    missing.append(use_cols)
+        for use_col in use_cols:
+            if use_col not in df.columns:
+                missing.append(use_cols)
         if len(missing) > 0:
             self.logger.lraise(
                 "the following use_cols were not found "
