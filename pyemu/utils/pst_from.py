@@ -2843,10 +2843,10 @@ class PstFrom(object):
         # wk: now using user supplied index_cols='auto_index' to trigger auto_index
         # using use_cols = None to read in all cols
         # getting a bit unclean w the checks?
-        if use_cols is None and index_cols == ['auto_index']:
+        if index_cols == ['auto_index']: # assume no header for auto_index
             header = None
         elif use_cols is None and index_cols != ['auto_index']: # index supplied infers header
-            header = 0
+            header = 0 # will need to read a header
         elif all(all(isinstance(_, int) for _ in a) for a in index_cols): # assume positional use_cols
             # index_cols are column numbers in input file
             header = None
@@ -3246,8 +3246,8 @@ def write_list_tpl(
             lambda x: "~  {0}  ~".format(x)
         )
     if par_style in ["m", "a"]:
-        if index_cols == ['auto_index']:
-            df_tpl = df_tpl.drop(['auto_index'], axis=1)
+        if index_cols == ['auto_index'] and 'auto_index' in df_tpl.columns:
+            df_tpl = df_tpl.drop('auto_index', axis=1)
         pyemu.helpers._write_df_tpl(
             filename=tpl_filename, df=df_tpl, sep=",", tpl_marker="~"
         )
@@ -3356,7 +3356,8 @@ def _write_direct_df_tpl(
         header = False
     if index_cols == ['auto_index']:
         header = False
-        direct_tpl_df = direct_tpl_df.drop(['auto_index'], axis=1)
+        if 'auto_index' in df_tpl.columns:
+            direct_tpl_df = direct_tpl_df.drop(['auto_index'], axis=1)
     pyemu.helpers._write_df_tpl(
         tpl_filename, direct_tpl_df, index=False, header=header, headerlines=headerlines
     )
