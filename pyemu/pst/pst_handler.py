@@ -7,9 +7,7 @@ import shutil
 import time
 import warnings
 import numpy as np
-from numpy.lib.type_check import real_if_close
 import pandas as pd
-
 
 pd.options.display.max_colwidth = 100
 # pd.options.mode.use_inf_as_na = True
@@ -20,6 +18,7 @@ from pyemu.pst import pst_utils
 from pyemu.plot import plot_utils
 
 # from pyemu.utils.os_utils import run
+
 
 def get_constraint_tags(ltgt='lt'):
     if ltgt == 'lt':
@@ -480,7 +479,7 @@ class Pst(object):
 
     @property
     def adj_par_groups(self):
-        """get the parameter groups with atleast one adjustable parameter
+        """get the parameter groups with at least one adjustable parameter
 
         Returns:
             [`str`]: a list of parameter groups with
@@ -770,7 +769,7 @@ class Pst(object):
             extras = []
             for _ in range(nrows):
                 line = f.readline()
-                extra = np.NaN
+                extra = np.nan
                 if "#" in line:
                     raw = line.strip().split("#")
                     extra = " # ".join(raw[1:])
@@ -901,7 +900,7 @@ class Pst(object):
                     r = er[0].split()
                 else:
                     r = line.strip().split()
-                    extra.append(np.NaN)
+                    extra.append(np.nan)
 
                 raw.append(r[: len(defaults)])
 
@@ -912,7 +911,7 @@ class Pst(object):
 
         for col in fieldnames:
             if col not in df.columns:
-                df.loc[:, col] = np.NaN
+                df.loc[:, col] = np.nan
             if col in defaults:
                 df[col] = df.loc[:, col].fillna(defaults[col])
             if col in converters:
@@ -970,7 +969,7 @@ class Pst(object):
                     raw = er[0].split()
                     extra.append("#".join(er[1:]))
                 else:
-                    extra.append(np.NaN)
+                    extra.append(np.nan)
                     raw = line.split()
                 pilbl.append(raw[0].lower())
                 obgnme.append(raw[-1].lower())
@@ -1104,7 +1103,7 @@ class Pst(object):
                         != self.control_data.ntplfle + self.control_data.ninsfle
                     ):
                         raise Exception(
-                            "didnt find the right number of '* model input/output' lines,"
+                            "didn't find the right number of '* model input/output' lines,"
                             + "expecting {0} template files and {1} instruction files".format(
                                 self.control_data.ntplfle, self.control_data.ninsfle
                             )
@@ -1236,7 +1235,7 @@ class Pst(object):
             "* model input" in sections_found or "* model output" in sections_found
         ):
             raise Exception(
-                "'* model input/output cant be used with '* model input' or '* model output'"
+                "'* model input/output can't be used with '* model input' or '* model output'"
             )
 
     def load(self, filename):
@@ -1246,7 +1245,7 @@ class Pst(object):
             filename (`str`): pst filename
 
         Note:
-            This method is called from the `Pst` construtor unless the `load` arg is `False`.
+            This method is called from the `Pst` constructor unless the `load` arg is `False`.
 
 
 
@@ -1581,7 +1580,7 @@ class Pst(object):
 
 
         Note:
-            checks for duplicate names, atleast 1 adjustable parameter
+            checks for duplicate names, at least 1 adjustable parameter
             and at least 1 non-zero-weighted observation
 
             Not nearly as comprehensive as pestchek
@@ -2090,7 +2089,7 @@ class Pst(object):
                 )
             except FileNotFoundError:
                 raise Exception(
-                    "iteration {} does not have a paramter file associated with it in {}".format(
+                    "iteration {} does not have a parameter file associated with it in {}".format(
                         citer, pstdir
                     )
                 )
@@ -2141,7 +2140,7 @@ class Pst(object):
                 If None, all parameters are in the new Pst instance. Default
                 is None
             obs_names ([`str`]): a list of observation names to have in the new Pst instance.
-                If None, all observations are in teh new Pst instance. Default
+                If None, all observations are in the new Pst instance. Default
                 is None
 
         Returns:
@@ -2229,8 +2228,8 @@ class Pst(object):
             parfile (`str`, optional): parameter file to use.  If None, try to find and use
                 a parameter file that corresponds to the case name.
                 If parfile has extension '.par' a single realization parameter file is used
-                If parfile has extention '.csv' an ensemble parameter file is used which invokes real_name
-                If parfile has extention '.jcb' a binary ensemble parameter file is used which invokes real_name
+                If parfile has extension '.csv' an ensemble parameter file is used which invokes real_name
+                If parfile has extension '.jcb' a binary ensemble parameter file is used which invokes real_name
                 Default is None
             enforce_bounds (`bool`, optional): flag to enforce parameter bounds after parameter values are updated.
                 This is useful because PEST and PEST++ round the parameter values in the
@@ -2585,35 +2584,35 @@ class Pst(object):
             new_weights.append(ow)
         self.observation_data.weight = new_weights
 
-    def calculate_pertubations(self):
+    def calculate_perturbations(self):
         """experimental method to calculate finite difference parameter
-        pertubations.
+        perturbations.
 
         Note:
 
-            The pertubation values are added to the
+            The perturbation values are added to the
             `Pst.parameter_data` attribute - user beware!
 
         """
         self.build_increments()
-        self.parameter_data.loc[:, "pertubation"] = (
+        self.parameter_data.loc[:, "perturbation"] = (
             self.parameter_data.parval1 + self.parameter_data.increment
         )
 
         self.parameter_data.loc[:, "out_forward"] = (
-            self.parameter_data.loc[:, "pertubation"]
+            self.parameter_data.loc[:, "perturbation"]
             > self.parameter_data.loc[:, "parubnd"]
         )
 
         out_forward = self.parameter_data.groupby("out_forward").groups
         if True in out_forward:
-            self.parameter_data.loc[out_forward[True], "pertubation"] = (
+            self.parameter_data.loc[out_forward[True], "perturbation"] = (
                 self.parameter_data.loc[out_forward[True], "parval1"]
                 - self.parameter_data.loc[out_forward[True], "increment"]
             )
 
             self.parameter_data.loc[:, "out_back"] = (
-                self.parameter_data.loc[:, "pertubation"]
+                self.parameter_data.loc[:, "perturbation"]
                 < self.parameter_data.loc[:, "parlbnd"]
             )
             out_back = self.parameter_data.groupby("out_back").groups
@@ -2622,14 +2621,14 @@ class Pst(object):
                 print(self.parameter_data.loc[still_out, :], flush=True)
 
                 raise Exception(
-                    "Pst.calculate_pertubations(): "
-                    + "can't calc pertubations for the following "
+                    "Pst.calculate_perturbations(): "
+                    + "can't calc perturbations for the following "
                     + "Parameters {0}".format(",".join(still_out))
                 )
 
     def build_increments(self):
         """experimental method to calculate parameter increments for use
-        in the finite difference pertubation calculations
+        in the finite difference perturbation calculations
 
         Note:
             user beware!
@@ -2745,12 +2744,12 @@ class Pst(object):
                 Default is None
             pst_path ('str'): the path from the control file to the IO files.  For example, if the
                 control will be in the same directory as the IO files, then `pst_path` should be '.'.
-                Default is None, which doesnt do any path manipulation on the I/O file names
+                Default is None, which doesn't do any path manipulation on the I/O file names
 
 
         Returns:
             `Pst`: new control file instance with parameter and observation names
-            found in `tpl_files` and `ins_files`, repsectively.
+            found in `tpl_files` and `ins_files`, respectively.
 
         Note:
             calls `pyemu.helpers.pst_from_io_files()`
@@ -2935,7 +2934,7 @@ class Pst(object):
             `pandas.DataFrame`: the parameter data for the parameters that were removed.
 
         Note:
-            This method does not check for multiple occurences of the same parameter name(s) in
+            This method does not check for multiple occurrences of the same parameter name(s) in
             across template files so if you have the same parameter in multiple template files,
             this is not the method you are looking for
 
@@ -2975,7 +2974,7 @@ class Pst(object):
         par_names = set(self.par_names)
         drop_pars_present = [p for p in drop_pars if p in par_names]
 
-        # check that other pars arent tied to the dropping pars
+        # check that other pars aren't tied to the dropping pars
         if "partied" in self.parameter_data.columns:
             par_tied = set(
                 self.parameter_data.loc[
@@ -3265,7 +3264,7 @@ class Pst(object):
 
 
         Args:
-            filename (`str`): filename. If None, use <case>.par.tex to write as LaTeX. If filename extention is '.xls' or '.xlsx',
+            filename (`str`): filename. If None, use <case>.par.tex to write as LaTeX. If filename extension is '.xls' or '.xlsx',
                 tries to write as an Excel file. If `filename` is "none", no table is written
                 Default is None
             group_names (`dict`): par group names : table names. For example {"w0":"well stress period 1"}.
@@ -3405,13 +3404,13 @@ class Pst(object):
 
     def write_obs_summary_table(self, filename=None, group_names=None):
         """write a stand alone observation summary latex table or Excel shet
-            filename (`str`): filename. If None, use <case>.par.tex to write as LaTeX. If filename extention is '.xls' or '.xlsx',
+            filename (`str`): filename. If None, use <case>.par.tex to write as LaTeX. If filename extension is '.xls' or '.xlsx',
                 tries to write as an Excel file. If `filename` is "none", no table is written
                 Default is None
 
         Args:
             filename (`str`): filename. If `filename` is "none", no table is written.
-                If None, use <case>.obs.tex. If filename extention is '.xls' or '.xlsx',
+                If None, use <case>.obs.tex. If filename extension is '.xls' or '.xlsx',
                 tries to write as an Excel file.
                 Default is None
             group_names (`dict`): obs group names : table names. For example {"hds":"simulated groundwater level"}.
@@ -3443,7 +3442,7 @@ class Pst(object):
 
         obs["stdev"] = obs.weight**-1
         obs["pe"] = 100.0 * (obs.stdev / obs.obsval.abs())
-        obs = obs.replace([np.inf, -np.inf], np.NaN)
+        obs = obs.replace([np.inf, -np.inf], np.nan)
 
         data = {c: [] for c in cols}
         for og, onames in obsgp.items():
@@ -3608,7 +3607,7 @@ class Pst(object):
         are listed as active (non-zero weight) greater than inequality constraints.
 
         Returns:
-            `pandas.Series`: names obseravtions that are non-zero weighted
+            `pandas.Series`: names observations that are non-zero weighted
             greater than constraints (`obgnme` startsiwth "g_" or "greater")
 
         Note:
@@ -3695,7 +3694,7 @@ class Pst(object):
         change_df.loc[nfpars, "fac_upper"] = base_vals / fpm
         change_df.loc[nfpars, "fac_lower"] = base_vals * fpm
 
-        # postive fac pars
+        # positive fac pars
         pfpars = par.loc[base_vals.apply(lambda x: x > 0)].index
         change_df.loc[pfpars, "fac_upper"] = base_vals * fpm
         change_df.loc[pfpars, "fac_lower"] = base_vals / fpm
@@ -3706,10 +3705,10 @@ class Pst(object):
         change_df.loc[:, "rel_upper"] = base_vals + rdelta
         change_df.loc[:, "rel_lower"] = base_vals - rdelta
 
-        change_df.loc[:, "chg_upper"] = np.NaN
+        change_df.loc[:, "chg_upper"] = np.nan
         change_df.loc[fpars, "chg_upper"] = change_df.fac_upper[fpars]
         change_df.loc[rpars, "chg_upper"] = change_df.rel_upper[rpars]
-        change_df.loc[:, "chg_lower"] = np.NaN
+        change_df.loc[:, "chg_lower"] = np.nan
         change_df.loc[fpars, "chg_lower"] = change_df.fac_lower[fpars]
         change_df.loc[rpars, "chg_lower"] = change_df.rel_lower[rpars]
 
@@ -3962,7 +3961,7 @@ def _multiprocess_obspar_rename(sys_file, map_dict, rex=None):
 
 # def _multiprocess_obspar_rename_v1(sys_file, map_dict, rex=None):
 #     # memory intensive as whole file is read into memory
-#     # maybe faster than v2 when file is big but map_dict is relativly small
+#     # maybe faster than v2 when file is big but map_dict is relatively small
 #     # but look out for memory
 #     if rex is None:
 #         rex = re.compile("|".join(
