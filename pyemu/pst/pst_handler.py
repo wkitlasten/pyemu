@@ -905,7 +905,7 @@ class Pst(object):
     @staticmethod
     def _parse_path_agnostic(filename):
         """private method to parse a file path for any os sep"""
-        filename = filename.replace("\\", os.sep).replace("/", os.sep)
+        filename = str(filename).replace("\\", os.sep).replace("/", os.sep)
         return os.path.split(filename)
 
     @staticmethod
